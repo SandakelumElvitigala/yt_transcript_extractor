@@ -1,6 +1,6 @@
 # 🎥 YouTube Transcript Extractor API
 
-A simple and powerful FastAPI-based REST API that allows users to extract transcripts from YouTube videos using only the video URL. This API utilizes the [`youtube-transcript-api`](https://pypi.org/project/youtube-transcript-api/) package to fetch transcripts and provides both segmented and full-text output.
+A simple and powerful FastAPI-based REST API that allows users to extract transcripts from YouTube videos using only the video URL. This API utilizes the [`yt_transcript_extractor`](https://pypi.org/project/yt_transcript_extractor/) package to fetch transcripts and provides both segmented and full-text output.
 
 ---
 
@@ -27,7 +27,7 @@ A simple and powerful FastAPI-based REST API that allows users to extract transc
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/yourusername/youtube-transcript-extractor.git
+git clone https://github.com/SandakelumElvitigala/yt_transcript_extractor.git
 cd youtube-transcript-extractor
 ```
 
