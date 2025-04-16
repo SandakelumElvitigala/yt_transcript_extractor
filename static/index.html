@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript Extractor</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .transcript-segment {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .transcript-segment:hover {
+            background-color: #f0f4f8;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-700">YouTube Transcript Extractor</h1>
+            <p class="text-gray-600 mt-2">Extract and display transcripts from any YouTube video</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="mb-4">
+                <label for="youtube-url" class="block text-gray-700 font-medium mb-2">YouTube URL</label>
+                <input type="text" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="mb-4">
+                <label for="language-code" class="block text-gray-700 font-medium mb-2">Language Code</label>
+                <select id="language-code" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="en">English (en)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="de">German (de)</option>
+                    <option value="it">Italian (it)</option>
+                    <option value="pt">Portuguese (pt)</option>
+                    <option value="ru">Russian (ru)</option>
+                    <option value="ja">Japanese (ja)</option>
+                    <option value="ko">Korean (ko)</option>
+                    <option value="zh-cn">Chinese Simplified (zh-cn)</option>
+                    <option value="zh-tw">Chinese Traditional (zh-tw)</option>
+                    <option value="ar">Arabic (ar)</option>
+                    <option value="hi">Hindi (hi)</option>
+                </select>
+            </div>
+            <button id="extract-btn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition">
+                Extract Transcript
+            </button>
+        </div>
+
+        <div id="loading" class="hidden">
+            <div class="loader"></div>
+            <p class="text-center text-gray-600 mt-2">Extracting transcript...</p>
+        </div>
+
+        <div id="error-message" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8 rounded">
+            <p class="font-bold">Error</p>
+            <p id="error-text"></p>
+        </div>
+
+        <div id="results" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">Video Information</h2>
+                    <div>
+                        <button id="copy-text-btn" class="bg-gray-200 text-gray-700 py-1 px-3 rounded-md hover:bg-gray-300 focus:outline-none text-sm mr-2">
+                            Copy Full Text
+                        </button>
+                        <button id="download-txt-btn" class="bg-green-600 text-white py-1 px-3 rounded-md hover:bg-green-700 focus:outline-none text-sm">
+                            Download as TXT
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="aspect-w-16 aspect-h-9 mb-4">
+                        <div id="video-embed" class="w-full"></div>
+                    </div>
+                    <h3 class="text-md font-medium text-gray-700 mb-1">Video ID: <span id="video-id" class="font-normal"></span></h3>
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-medium text-gray-800">Full Transcript</h3>
+                        <div class="flex items-center">
+                            <label for="display-mode" class="text-sm text-gray-600 mr-2">Display mode:</label>
+                            <select id="display-mode" class="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                                <option value="segmented">Segmented</option>
+                                <option value="full">Full Text</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="transcript-segments" class="border border-gray-200 rounded-md p-4 max-h-96 overflow-y-auto bg-gray-50"></div>
+                    <div id="full-text" class="hidden border border-gray-200 rounded-md p-4 max-h-96 overflow-y-auto bg-gray-50 whitespace-pre-wrap"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-gray-800 text-white text-center py-4 mt-8">
+        <p>YouTube Transcript Extractor © 2025</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const extractBtn = document.getElementById('extract-btn');
+            const youtubeUrlInput = document.getElementById('youtube-url');
+            const languageSelect = document.getElementById('language-code');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            const resultsDiv = document.getElementById('results');
+            const videoIdSpan = document.getElementById('video-id');
+            const videoEmbed = document.getElementById('video-embed');
+            const transcriptSegments = document.getElementById('transcript-segments');
+            const fullTextDiv = document.getElementById('full-text');
+            const displayModeSelect = document.getElementById('display-mode');
+            const copyTextBtn = document.getElementById('copy-text-btn');
+            const downloadTxtBtn = document.getElementById('download-txt-btn');
+            
+            let transcriptData = null;
+            
+            extractBtn.addEventListener('click', function() {
+                const youtubeUrl = youtubeUrlInput.value.trim();
+                const languageCode = languageSelect.value;
+                
+                if (!youtubeUrl) {
+                    showError('Please enter a YouTube URL');
+                    return;
+                }
+                
+                // Hide previous results and errors
+                resultsDiv.classList.add('hidden');
+                errorDiv.classList.add('hidden');
+                
+                // Show loading indicator
+                loadingDiv.classList.remove('hidden');
+                
+                // Call the API
+                fetchTranscript(youtubeUrl, languageCode);
+            });
+            
+            displayModeSelect.addEventListener('change', function() {
+                if (this.value === 'segmented') {
+                    transcriptSegments.classList.remove('hidden');
+                    fullTextDiv.classList.add('hidden');
+                } else {
+                    transcriptSegments.classList.add('hidden');
+                    fullTextDiv.classList.remove('hidden');
+                }
+            });
+            
+            copyTextBtn.addEventListener('click', function() {
+                if (transcriptData) {
+                    navigator.clipboard.writeText(transcriptData.full_text)
+                        .then(() => {
+                            const originalText = copyTextBtn.textContent;
+                            copyTextBtn.textContent = 'Copied!';
+                            setTimeout(() => {
+                                copyTextBtn.textContent = originalText;
+                            }, 2000);
+                        })
+                        .catch(err => {
+                            showError('Failed to copy: ' + err);
+                        });
+                }
+            });
+            
+            downloadTxtBtn.addEventListener('click', function() {
+                if (transcriptData) {
+                    const blob = new Blob([transcriptData.full_text], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `transcript_${transcriptData.video_id}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            });
+            
+            function fetchTranscript(youtubeUrl, languageCode) {
+                // Update with your actual API endpoint
+                const apiUrl = '/extract-transcript/';
+                
+                fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        youtube_url: youtubeUrl,
+                        language_code: languageCode
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.detail || 'Failed to extract transcript');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    loadingDiv.classList.add('hidden');
+                    transcriptData = data;
+                    displayResults(data);
+                })
+                .catch(error => {
+                    loadingDiv.classList.add('hidden');
+                    showError(error.message);
+                });
+            }
+            
+            function displayResults(data) {
+                videoIdSpan.textContent = data.video_id;
+                
+                // Create video embed
+                videoEmbed.innerHTML = `
+                    <iframe width="100%" height="315" 
+                        src="https://www.youtube.com/embed/${data.video_id}" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen>
+                    </iframe>
+                `;
+                
+                // Display transcript segments
+                transcriptSegments.innerHTML = '';
+                data.transcript.forEach((segment, index) => {
+                    const formattedTime = moment.utc(segment.start * 1000).format('HH:mm:ss');
+                    const div = document.createElement('div');
+                    div.className = 'transcript-segment p-2 border-b border-gray-200 hover:bg-gray-100';
+                    div.innerHTML = `
+                        <span class="text-indigo-600 font-medium">[${formattedTime}]</span> 
+                        <span>${segment.text}</span>
+                    `;
+                    div.addEventListener('click', () => {
+                        const videoIframe = document.querySelector('#video-embed iframe');
+                        if (videoIframe) {
+                            const currentSrc = videoIframe.src;
+                            const newSrc = currentSrc.split('?')[0] + `?start=${Math.floor(segment.start)}`;
+                            videoIframe.src = newSrc;
+                        }
+                    });
+                    transcriptSegments.appendChild(div);
+                });
+                
+                // Display full text
+                fullTextDiv.textContent = data.full_text;
+                
+                // Show results
+                resultsDiv.classList.remove('hidden');
+            }
+            
+            function showError(message) {
+                errorText.textContent = message;
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
